@@ -17,13 +17,10 @@ struct code {
 
 struct closure {
     struct object head;
-    bool native;
     
     objptr_t parameter_list;
     struct code code;
     objptr_t environment;
-    
-    // TODO: Field for native code
 };
 
 

@@ -5,7 +5,6 @@
 
 void init_closure(struct closure *closure)
 {
-    closure->native = false;
     closure->parameter_list = EMPTY_LIST;
     closure->code.constant_vector = EMPTY_LIST;
     closure->code.code_size = 0;
