@@ -213,8 +213,8 @@ void environment_bind(objptr_t ptr, objptr_t variable, objptr_t value)
 			EMPTY_LIST,
 			EQV_STRICT)) {
 		    /*
-		     * Slots are initialized with EMPTY_LIST keys,
-		     * so we have found a nice spot ;-)
+		     * Slots are usually initialized with EMPTY_LIST keys,
+		     * so we have found a nice spot to place our variable ;-)
 		     */
 		    environment->slots[i].key = variable;
 		    increase_refcount(variable);
@@ -247,7 +247,7 @@ void environment_bind(objptr_t ptr, objptr_t variable, objptr_t value)
 	increase_refcount(value);
 	environment->extended_slot_count++;
     } else {
-	/* Replace an existing environment */
+	/* Replace an existing binding */
 	decrease_refcount(*binding);
 	*binding = value;
 	increase_refcount(value);
