@@ -4,15 +4,9 @@
 #define CLOSURE_H_
 
 
+#include "compiler.h"
+
 #include "object.h"
-
-
-struct code {
-    objptr_t constant_vector;
-    unsigned int code_size;
-    unsigned int code_alloc;
-    unsigned int *codes;
-};
 
 
 struct closure {
@@ -25,7 +19,6 @@ struct closure {
 
 
 extern struct object_type TYPE_CLOSURE;
-
 
 // TODO
 

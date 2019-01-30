@@ -11,6 +11,13 @@
 static struct symbol *SYMBOL_TABLE;
 
 
+objptr_t SYMBOL_DEFINE;
+objptr_t SYMBOL_QUOTE;
+objptr_t SYMBOL_LAMBDA;
+objptr_t SYMBOL_LET;
+objptr_t SYMBOL_SETBANG;
+
+
 
 void init_symbol(struct symbol *symbol)
 {    
@@ -152,9 +159,25 @@ objptr_t symbol_to_string(objptr_t ptr)
 
 
 
+
+void init_global_symbol(objptr_t *slot, const char *name)
+{
+    *slot = c_string_to_symbol(name);
+    declare_root_object(*slot);
+    make_refcount_immune(*slot);
+}
+
+
 void init_symbols()
 {
     SYMBOL_TABLE = NULL;
+
+    // Init symbols
+    init_global_symbol(&SYMBOL_DEFINE, "define");
+    init_global_symbol(&SYMBOL_QUOTE, "quote");
+    init_global_symbol(&SYMBOL_LAMBDA, "lambda");
+    init_global_symbol(&SYMBOL_LET, "let");
+    init_global_symbol(&SYMBOL_SETBANG, "set!");
 }
 
 

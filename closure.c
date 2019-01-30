@@ -1,15 +1,15 @@
 #include <stdlib.h>
 
+#include "compiler.h"
+
 #include "closure.h"
+
 
 
 void init_closure(struct closure *closure)
 {
     closure->parameter_list = EMPTY_LIST;
-    closure->code.constant_vector = EMPTY_LIST;
-    closure->code.code_size = 0;
-    closure->code.code_alloc = 0;
-    closure->code.codes = NULL;
+    init_code(&(closure->code));
     closure->environment = EMPTY_LIST;
 }
 
@@ -18,15 +18,10 @@ void terminate_closure(struct closure *closure)
 {
     decrease_refcount(closure->parameter_list);
     closure->parameter_list = EMPTY_LIST;
-    decrease_refcount(closure->code.constant_vector);
-    closure->code.constant_vector = EMPTY_LIST;
     decrease_refcount(closure->environment);
     closure->environment = EMPTY_LIST;
 
-    if (closure->code.codes != NULL) {
-	free(closure->code.codes);
-	closure->code.codes = NULL;
-    }
+    terminate_code(&(closure->code));
 }
 
 
@@ -63,5 +58,3 @@ DEFTYPE(TYPE_CLOSURE,
 	closure_slot_accessor,
 	closure_eqv);
 
-
-// TODO

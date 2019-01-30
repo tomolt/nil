@@ -21,11 +21,16 @@ struct symbol {
 
 extern struct object_type TYPE_SYMBOL;
 
+extern objptr_t SYMBOL_DEFINE;
+extern objptr_t SYMBOL_QUOTE;
+extern objptr_t SYMBOL_LAMBDA;
+extern objptr_t SYMBOL_LET;
+extern objptr_t SYMBOL_SETBANG;
+
 
 objptr_t c_string_to_symbol(const char*);
 objptr_t string_to_symbol(objptr_t);
 objptr_t symbol_to_string(objptr_t);
-// TODO
 
 void init_symbols();
 void terminate_symbols();
