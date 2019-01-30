@@ -10,6 +10,9 @@ typedef unsigned int instr_t;
 
 #define INSTRUCTION(CODE, ARG) ((((CODE) << 24) & INSTRUCTION_MASK) | ((ARG) & PARAMETER_MASK))
 
+#define INSTRUCTION_PART(I) (((I) >> 24) & 0xff)
+#define ARGUMENT_PART(I) ((I) & PARAMETER_MASK)
+
 #define INSTR_HALT         0x00
 #define INSTR_PUSH_CONST   0x01
 #define INSTR_LOOKUP_CONST 0x02

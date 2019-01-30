@@ -5,6 +5,8 @@
 #include "symbol.h"
 #include "vector.h"
 
+#include "compiler.h"
+
 
 void go()
 {

@@ -277,7 +277,6 @@ static void compile_expression(objptr_t expr,
             code_push_instruction(code, INSTRUCTION(INSTR_MAKE_CLOSURE, pos));
             
         } else {
-        
             /*
              * No builtin special form has matched, so we compile
              * a basic function call.
@@ -285,11 +284,13 @@ static void compile_expression(objptr_t expr,
             compile_expression(car, code, false);
             param_count = compile_parameter_list(cdr, code);
             if (enable_tailcall) {
-                code_push_instruction(code, INSTRUCTION(INSTR_TAILCALL,
-                                                        param_count));
+                code_push_instruction(code,
+                                      INSTRUCTION(INSTR_TAILCALL,
+                                                  param_count));
             } else {
-                code_push_instruction(code, INSTRUCTION(INSTR_CALL,
-                                                        param_count));
+                code_push_instruction(code,
+                                      INSTRUCTION(INSTR_CALL,
+                                                  param_count));
             }
         }
     } else {
