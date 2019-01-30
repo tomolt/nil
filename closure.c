@@ -58,3 +58,19 @@ DEFTYPE(TYPE_CLOSURE,
 	closure_slot_accessor,
 	closure_eqv);
 
+
+objptr_t make_closure_prototype(objptr_t params)
+{
+    objptr_t ptr;
+    struct closure *instance;
+
+    ptr = object_allocate(&TYPE_CLOSURE);
+
+    if (ptr != EMPTY_LIST) {
+        instance = (struct closure*) dereference(ptr);
+        instance->parameter_list = params;
+        increase_refcount(instance->parameter_list);
+    }
+
+    return ptr;
+}

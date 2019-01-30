@@ -1,6 +1,7 @@
 #include <assert.h>
 #include <stdlib.h>
 
+#include "closure.h"
 #include "symbol.h"
 #include "pair.h"
 #include "vector.h"
@@ -64,10 +65,13 @@ unsigned int code_add_constant(struct code *code, objptr_t constant)
 
     if (code->constant_vector == EMPTY_LIST) {
         code->constant_vector = object_allocate(&TYPE_VECTOR);
+        // FIXME: Handle allocation failures
     }
 
-    // FIXME: Handle allocation failures
-
+    // TODO: Check whether the object already is in the vector,
+    // so that we can avoid storing multiple instances in the
+    // same vector.
+    
     pos = vector_length(code->constant_vector);
     vector_append(code->constant_vector, constant);
 
@@ -104,7 +108,6 @@ void terminate_code(struct code *code)
 
 
 
-
 /*
  * Compiler
  */
@@ -117,7 +120,8 @@ static unsigned int compile_parameter_list(objptr_t params,
 {
     unsigned int param_count;
 
-    for (param_count = 0; is_of_type(params, &TYPE_PAIR); param_count++) {
+    for (param_count = 0; is_of_type(params, &TYPE_PAIR); param_count++)
+    {
         compile_expression(get_car(params), code, false);
         params = get_cdr(params);
     }
@@ -126,9 +130,55 @@ static unsigned int compile_parameter_list(objptr_t params,
 }
 
 
+static void compile_begin(objptr_t expr_list,
+                          struct code *code,
+                          bool enable_tailcall)
+{
+    while (is_of_type(expr_list, &TYPE_PAIR))
+    {
+        if (is_of_type(get_cdr(expr_list), &TYPE_PAIR)) {
+            /*
+             * This code is located in the middle of a BEGIN
+             * block, so we have to pop the return value.
+             */
+            compile_expression(get_car(expr_list), code, false);
+            code_push_instruction(code, INSTRUCTION(INSTR_POP, 1));
+        } else {
+            /*
+             * This is the last element in the block, so we can
+             * use tailcall elimination here.
+             */
+            compile_expression(get_car(expr_list), code, enable_tailcall);
+        }
+        expr_list = get_cdr(expr_list);
+    }
+}
+
+
+static objptr_t compile_lambda_prototype(objptr_t params, objptr_t body)
+{
+    objptr_t func;
+    struct closure *instance;
+    
+    func = make_closure_prototype(params);
+
+    if (func != EMPTY_LIST) {
+        instance = (struct closure*) dereference(func);
+        compile_begin(body, &(instance->code), true);
+    }
+
+    return func;
+}
+
+
 static void compile_expression(objptr_t expr,
                                struct code *code,
                                bool enable_tailcall)
+/*
+ * TODO: Add another parameter: no_stack_effect, for use
+ * in BEGIN blocks. This parameter will also have to be
+ * implemented in all other compiler subroutines.
+ */
 {
     objptr_t car;
     objptr_t cdr;
@@ -155,7 +205,6 @@ static void compile_expression(objptr_t expr,
         if (car == SYMBOL_QUOTE) {
             pos = code_add_constant(code, get_car(get_cdr(expr)));
             code_push_instruction(code, INSTRUCTION(INSTR_PUSH_CONST, pos));
-            // TODO: Add lambda, set!, let, define, ...
             
         } else if (car == SYMBOL_SETBANG) {
             cadr = get_car(get_cdr(expr));
@@ -167,6 +216,17 @@ static void compile_expression(objptr_t expr,
                 code_push_instruction(code, INSTRUCTION(INSTR_BIND_CONST, pos));
             } // TODO: else: error!
 
+        } else if (car == SYMBOL_DEFINE) {
+            cadr = get_car(get_cdr(expr));
+            caddr = get_car(get_cdr(get_cdr(expr)));
+            
+            if (cadr != EMPTY_LIST) {
+                pos = code_add_constant(code, cadr);
+                compile_expression(caddr, code, false);
+                code_push_instruction(code,
+                                      INSTRUCTION(INSTR_DEFINE_CONST, pos));
+            } // TODO: else: error!
+            
         } else if (car == SYMBOL_IF) {
             unsigned int jmploc;
             unsigned int endloc;
@@ -200,6 +260,22 @@ static void compile_expression(objptr_t expr,
                                  endloc,
                                  INSTRUCTION(INSTR_JMP,
                                              code_get_write_location(code)));
+
+        } else if (car == SYMBOL_BEGIN) {
+            compile_begin(get_cdr(expr), code, enable_tailcall);
+            
+        } else if (car == SYMBOL_LAMBDA) {
+            objptr_t param_list;
+            objptr_t body;
+            objptr_t func;
+
+            param_list = get_car(get_cdr(expr));
+            body = get_car(get_cdr(get_cdr(expr)));
+
+            func = compile_lambda_prototype(param_list, body);
+            pos = code_add_constant(code, func);
+            code_push_instruction(code, INSTRUCTION(INSTR_MAKE_CLOSURE, pos));
+            
         } else {
         
             /*
@@ -220,7 +296,8 @@ static void compile_expression(objptr_t expr,
         /*
          * All other objects evaluate to themselves.
          */
-        // TODO
+        pos = code_add_constant(code, expr);
+        code_push_instruction(code, INSTRUCTION(INSTR_PUSH_CONST, pos));
     }
 }
 

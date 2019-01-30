@@ -17,6 +17,7 @@ objptr_t SYMBOL_LAMBDA;
 objptr_t SYMBOL_LET;
 objptr_t SYMBOL_SETBANG;
 objptr_t SYMBOL_IF;
+objptr_t SYMBOL_BEGIN;
 
 
 void init_symbol(struct symbol *symbol)
@@ -179,6 +180,7 @@ void init_symbols()
     init_global_symbol(&SYMBOL_LET, "let");
     init_global_symbol(&SYMBOL_SETBANG, "set!");
     init_global_symbol(&SYMBOL_IF, "if");
+    init_global_symbol(&SYMBOL_BEGIN, "begin");
 }
 
 

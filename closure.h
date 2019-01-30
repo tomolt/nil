@@ -20,6 +20,6 @@ struct closure {
 
 extern struct object_type TYPE_CLOSURE;
 
-// TODO
+objptr_t make_closure_prototype(objptr_t);
 
 #endif
