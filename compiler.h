@@ -19,6 +19,9 @@ struct code {
 
 
 unsigned int code_push_instruction(struct code*, instr_t);
+void code_set_instruction(struct code*, instr_t, unsigned int);
+unsigned int code_add_constant(struct code*, objptr_t);
+unsigned int code_get_write_location(struct code*);
 
 void compile(objptr_t, struct code*);
 

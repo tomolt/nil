@@ -26,7 +26,8 @@ extern objptr_t SYMBOL_QUOTE;
 extern objptr_t SYMBOL_LAMBDA;
 extern objptr_t SYMBOL_LET;
 extern objptr_t SYMBOL_SETBANG;
-
+extern objptr_t SYMBOL_IF;
+extern objptr_t SYMBOL_BEGIN;
 
 objptr_t c_string_to_symbol(const char*);
 objptr_t string_to_symbol(objptr_t);

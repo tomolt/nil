@@ -14,8 +14,9 @@ typedef unsigned int instr_t;
 #define INSTR_PUSH_CONST   0x01
 #define INSTR_LOOKUP_CONST 0x02
 #define INSTR_JMP          0x03
-#define INSTR_JUMP_IF      0x04
+#define INSTR_JMP_IF_NOT   0x04
 #define INSTR_CALL         0x05
 #define INSTR_TAILCALL     0x06
+#define INSTR_BIND_CONST   0x07
 
 #endif
