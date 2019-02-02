@@ -213,7 +213,7 @@ static void compile_expression(objptr_t expr,
             if (cadr != EMPTY_LIST) {
                 pos = code_add_constant(code, cadr);
                 compile_expression(caddr, code, false);
-                code_push_instruction(code, INSTRUCTION(INSTR_BIND_CONST, pos));
+                code_push_instruction(code, INSTRUCTION(INSTR_SET_CONST, pos));
             } // TODO: else: error!
 
         } else if (car == SYMBOL_DEFINE) {
