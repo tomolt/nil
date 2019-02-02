@@ -11,8 +11,12 @@
 
 struct closure {
     struct object head;
+
+    bool is_macro;
     
-    objptr_t parameter_list;
+    objptr_t parameter_vector;
+    objptr_t rest_parameter;
+    
     struct code code;
     objptr_t environment;
 };
