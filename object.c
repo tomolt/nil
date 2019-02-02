@@ -42,7 +42,9 @@ static struct object *INTERN_object_allocate_instance(struct object_type *type)
 	instance = (struct object*) block;
     } else {
 	instance = malloc(type->size);
-	type->active_block_count++;
+	if (instance != NULL) {
+	    type->active_block_count++;
+	}
     }
     
     if (instance != NULL) {
