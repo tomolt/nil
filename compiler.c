@@ -218,9 +218,22 @@ static void compile_expression(objptr_t expr,
 
         } else if (car == SYMBOL_DEFINE) {
             cadr = get_car(get_cdr(expr));
-            caddr = get_car(get_cdr(get_cdr(expr)));
-            
-            if (cadr != EMPTY_LIST) {
+
+	    if (is_of_type(cadr, &TYPE_PAIR)) {
+		/*
+		 * This is the (define (func . args) . body) part
+		 */
+		objptr_t func;
+		pos = code_add_constant(code, get_car(cadr));
+		func = compile_lambda_prototype(get_cdr(cadr), get_cdr(get_cdr(expr)));
+		code_push_instruction(code, INSTRUCTION(INSTR_MAKE_CLOSURE,
+							code_add_constant(code, func)));
+		code_push_instruction(code, INSTRUCTION(INSTR_DEFINE_CONST, pos));
+	    } else if (cadr != EMPTY_LIST) {
+		/*
+		 * This is the (define foo bar) part
+		 */
+		caddr = get_car(get_cdr(get_cdr(expr)));
                 pos = code_add_constant(code, cadr);
                 compile_expression(caddr, code, false);
                 code_push_instruction(code,

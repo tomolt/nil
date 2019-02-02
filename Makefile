@@ -4,6 +4,7 @@ CFLAGS = -Wall -g
 LDFLAGS = 
 
 OBJECTS = \
+fiber.o \
 compiler.o \
 closure.o \
 symbol.o \
