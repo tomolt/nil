@@ -21,8 +21,8 @@ typedef unsigned int instr_t;
 #define INSTR_CALL         0x05
 #define INSTR_TAILCALL     0x06
 #define INSTR_SET_CONST    0x07
-#define INSTR_DEFINE_CONST 0x07  /* Currently the same as BIND */
-#define INSTR_POP          0x08  /* POP n, pops n objects */
-#define INSTR_MAKE_CLOSURE 0x09
+#define INSTR_DEFINE_CONST 0x08
+#define INSTR_POP          0x09  /* POP n, pops n objects */
+#define INSTR_MAKE_CLOSURE 0x0a
 
 #endif

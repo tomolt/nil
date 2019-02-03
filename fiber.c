@@ -5,6 +5,7 @@
 #include "closure.h"
 #include "vector.h"
 #include "pair.h"
+#include "environment.h"
 
 #include "fiber.h"
 
@@ -119,6 +120,26 @@ static void fiber_push(struct fiber *fib, objptr_t obj)
     new_stack = cons(obj, fib->stack_ptr);
     decrease_refcount(fib->stack_ptr);
     fib->stack_ptr = new_stack;
+    increase_refcount(fib->stack_ptr);
+}
+
+
+static objptr_t fiber_pop(struct fiber *fib)
+{
+    objptr_t object;
+    objptr_t next_elem;
+
+    /*
+     * XXX: Does this GC code really work?
+     */
+    
+    object = get_car(fib->stack_ptr);
+    increase_refcount(object);
+    next_elem = get_cdr(fib->stack_ptr);
+    increase_refcount(next_elem);
+    decrease_refcount(fib->stack_ptr);
+    fib->stack_ptr = next_elem;
+    return object;
 }
 
 
@@ -184,6 +205,49 @@ void fiber_tick(struct fiber *fib)
 	fiber_push(fib, code_pointer_get_constant(&(fib->instr_pointer), argument));
 	break;
 
-	// TODO!
+    case INSTR_LOOKUP_CONST:
+	object = code_pointer_get_constant(&(fib->instr_pointer), argument);
+	fiber_push(fib, environment_get_binding(fib->environment, object));
+	break;
+
+    case INSTR_JMP:
+	code_pointer_jump(&(fib->instr_pointer), argument);
+	break;
+
+    case INSTR_JMP_IF_NOT:
+	object = fiber_pop(fib);
+	if (object != NIL_FALSE) {
+	    code_pointer_jump(&(fib->instr_pointer), argument);
+	}
+	decrease_refcount(object);
+	break;
+
+    case INSTR_CALL:
+	// TODO
+	break;
+
+    case INSTR_TAILCALL:
+	// TODO
+	break;
+
+    case INSTR_SET_CONST:
+	// TODO
+	break;
+
+    case INSTR_DEFINE_CONST:
+	// TODO
+	break;
+
+    case INSTR_POP:
+	decrease_refcount(fiber_pop(fib));
+	break;
+
+    case INSTR_MAKE_CLOSURE:
+	// TODO
+	break;
+
+    default:
+	// TODO
+	break;
     }
 }
