@@ -16,12 +16,15 @@ struct code_pointer {
     unsigned int offset;
 };
 
+
 void code_pointer_init_from_func(struct code_pointer*, objptr_t);
+void code_pointer_copy(struct code_pointer*, struct code_pointer*);
 void code_pointer_terminate(struct code_pointer*);
 instr_t code_pointer_get(struct code_pointer*);
 objptr_t code_pointer_get_constant(struct code_pointer*, unsigned int);
 void code_pointer_jump(struct code_pointer*, unsigned int);
 bool code_pointer_is_valid(struct code_pointer*);
+
 
 
 struct continuation_frame {
@@ -34,10 +37,23 @@ struct continuation_frame {
 };
 
 
+
+
 struct fiber {
     // TODO: Prev/Next fiber
     // TODO: Waiting condition
+    
+    objptr_t clink;  // Continuation / Frame stack
+    objptr_t stack_ptr;
+    objptr_t environment;
+    struct code_pointer instr_pointer;
 };
+
+
+void fiber_init(struct fiber*, objptr_t);
+void fiber_terminate(struct fiber*);
+
+void fiber_tick(struct fiber*);
 
 
 #endif
