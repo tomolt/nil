@@ -12,9 +12,12 @@
 void go()
 {
     bool fail;
+    objptr_t func;
     
     FILE *f = fopen("./lib/boot.scm", "r");
-    start_in_fiber(compile_to_thunk(baby_read(f, &fail), EMPTY_LIST));
+    func = compile_to_thunk(baby_read(f, &fail), EMPTY_LIST);
+    declare_root_object(func);
+    start_in_fiber(func);
     run_main_loop();
     fclose(f);
 }

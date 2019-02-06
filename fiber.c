@@ -177,18 +177,16 @@ void fiber_enter_closure(struct fiber *fib, objptr_t closure)
 }
 
 
-void fiber_init(struct fiber *fib, objptr_t thunk)
+void fiber_init(struct fiber *fib)
 {
     assert(fib != NULL);
 
-    fib->waiting_condition.state = RUNNING;
+    fib->waiting_condition.state = HALTED;
     
     fib->clink = EMPTY_LIST;
     fib->stack_ptr = EMPTY_LIST;
-    fiber_enter_closure(fib, thunk);
     fib->environment = EMPTY_LIST;
     code_pointer_init(&(fib->instr_pointer));
-    fiber_enter_closure(fib, thunk);
 
     /*
      * Link into FIBER_LIST
@@ -232,6 +230,48 @@ void fiber_terminate(struct fiber *fib)
     code_pointer_terminate(&(fib->instr_pointer));
 }
 
+
+unsigned int fiber_slot_count(struct fiber *fib)
+{
+    return 4;
+}
+
+
+objptr_t fiber_slot_accessor(struct fiber *fib, unsigned int slot)
+{
+    switch (slot) {
+    case 0: return fib->clink;
+    case 1: return fib->stack_ptr;
+    case 2: return fib->environment;
+    case 3: return fib->instr_pointer.func;
+    default: return EMPTY_LIST;
+    }
+}
+
+
+bool fiber_eqv(struct fiber *f1,
+               struct fiber *f2,
+               enum eqv_strictness strictness)
+{
+    return f1 == f2;
+}
+
+
+DEFTYPE(TYPE_FIBER,
+        struct fiber,
+        fiber_init,
+        fiber_terminate,
+        fiber_slot_count,
+        fiber_slot_accessor,
+        fiber_eqv);
+
+
+
+static void fiber_launch(struct fiber *fib, objptr_t thunk)
+{
+    fib->waiting_condition.state = RUNNING;
+    fiber_enter_closure(fib, thunk);
+}
 
 
 static void fiber_push(struct fiber *fib, objptr_t obj)
@@ -346,7 +386,7 @@ static objptr_t fiber_unwrap_params(struct fiber *fib,
  * Bytecode interpreter
  */
 
-void fiber_tick(struct fiber *fib)
+static void fiber_tick(struct fiber *fib)
 {
     /*
      * This is the magic bytecode execution function!
@@ -521,12 +561,18 @@ void fiber_tick(struct fiber *fib)
 
 struct fiber *start_in_fiber(objptr_t thunk)
 {
+    objptr_t ptr;
     struct fiber *fib;
 
-    fib = malloc(sizeof(struct fiber));
+    ptr = object_allocate(&TYPE_FIBER);
 
-    if (fib != NULL) {
-        fiber_init(fib, thunk);
+    if (ptr != EMPTY_LIST) {
+        make_refcount_immune(ptr);
+        fib = (struct fiber*) dereference(ptr);
+        fib->self = ptr;
+        fiber_launch(fib, thunk);
+    } else {
+        fib = NULL;
     }
 
     return fib;
@@ -536,8 +582,9 @@ struct fiber *start_in_fiber(objptr_t thunk)
 void run_main_loop()
 {
     while (FIBER_LIST != NULL) {
+        maybe_garbage_collect();
+
         // TODO: Go to next fiber if current fiber is blocked
-        // TODO: Call garbage_collect() here!  (Mark all fibers!)
         FIBER_LIST = FIBER_LIST->next;
 
         switch (FIBER_LIST->waiting_condition.state) {

@@ -22,8 +22,6 @@ unsigned int code_push_instruction(struct code *code,
     unsigned int new_alloc;
 
     assert(code != NULL);
-
-    printf("%03x <- %08x\n", code->code_size, instruction);
     
     if (code->code_alloc >= code->code_size) {        
         if (code->code_alloc == 0) {
@@ -53,8 +51,6 @@ void code_set_instruction(struct code *code,
      */
     
     assert(code != NULL);
-
-    printf("%03x <- %08x (:)\n", pos, instruction);
     
     if (pos < code->code_alloc) {
         code->codes[pos] = instruction;

@@ -52,6 +52,9 @@ struct fiber_waiting_condition {
 
 
 struct fiber {
+    struct object head;
+    
+    objptr_t self;
     struct fiber *prev;
     struct fiber *next;
 
@@ -63,9 +66,6 @@ struct fiber {
     struct code_pointer instr_pointer;
 };
 
-
-void fiber_init(struct fiber*, objptr_t);
-void fiber_terminate(struct fiber*);
 
 struct fiber *start_in_fiber(objptr_t);
 

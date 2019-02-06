@@ -2,7 +2,10 @@
 #include <assert.h>
 #include <stdlib.h>
 
+#include "fiber.h"
+
 #include "object.h"
+
 
 
 
@@ -109,7 +112,7 @@ static void INTERN_mark_object(struct object *object)
 static void INTERN_unmark_object(struct object *object)
 {
     if (object != NULL) {
-	object->flags &= ~OBJECT_MARK_FLAG_BITMASK;
+	object->flags = object->flags & (~OBJECT_MARK_FLAG_BITMASK);
     }
 }
 
@@ -413,8 +416,7 @@ void decrease_refcount(objptr_t ptr)
     struct object *object;
 
 
-    if (GLOBAL_REFCOUNT_LOCK
-	|| ptr == EMPTY_LIST
+    if (ptr == EMPTY_LIST
 	|| ptr == NIL_TRUE
 	|| ptr == NIL_FALSE) {
 	return;
@@ -434,7 +436,8 @@ void decrease_refcount(objptr_t ptr)
                & OBJECT_REFCOUNT_BITMASK);
     }
 
-    if ((object->flags & OBJECT_REFCOUNT_BITMASK) == 0) {
+    if (((object->flags & OBJECT_REFCOUNT_BITMASK) == 0)
+        && !GLOBAL_REFCOUNT_LOCK) {
 	object_deallocate(ptr);
     }
 }
@@ -452,7 +455,7 @@ static void mark_object(objptr_t ptr)
     unsigned int index;
     unsigned int count;
     struct object *object;
-
+    
     /*
      * Get the object
      */
@@ -467,7 +470,7 @@ static void mark_object(objptr_t ptr)
     } else {
 	INTERN_mark_object(object);
     }
-
+    
     /*
      * Loop over the object's slots and mark them.
      * TODO: Use an external stack for this to avoid a
@@ -517,13 +520,32 @@ void make_refcount_immune(objptr_t ptr)
 }
 
 
+
+extern struct fiber *FIBER_LIST;
+
 static void mark()
 {
     unsigned int index;
-
+    struct fiber *fib, *end;
+    
+    /*
+     * Mark root objects
+     */
     for (index = 0; index < ROOT_OBJECT_POOL_SIZE; index++)
     {
 	mark_object(ROOT_OBJECT_POOL[index]);
+    }
+
+    /*
+     * Mark fibers
+     */
+    if (FIBER_LIST != NULL) {
+        fib = FIBER_LIST;
+        end = fib;
+        do {
+            mark_object(fib->self);
+            fib = fib->next;
+        } while (fib != NULL && fib != end);
     }
 }
 
@@ -531,6 +553,7 @@ static void mark()
 static void sweep()
 {
     unsigned long current_slot;
+    bool refcount_lock_keeper;
 
     /*
      * This garbage collector doesn't rebuild the freelist,
@@ -539,6 +562,10 @@ static void sweep()
      * unmarked objects. NULLs are considered to be part of
      * the freelist.
      */
+
+    // We set the refcount lock to avoid accidental refcount garbage collection
+    refcount_lock_keeper = GLOBAL_REFCOUNT_LOCK;
+    GLOBAL_REFCOUNT_LOCK = true;
     
     for (current_slot = 0;
 	 current_slot < HEAP_ARRAY_SLOT_COUNT;
@@ -570,21 +597,28 @@ static void sweep()
 	    object_deallocate(heap_array_address_to_objptr(&(HEAP_ARRAY[current_slot])));
 	}
     }
+
+    GLOBAL_REFCOUNT_LOCK = refcount_lock_keeper;
 }
 
 
-void garbage_collect()
+static void garbage_collect()
 {
     mark();
     sweep();
 }
 
-/*
-static void maybe_garbage_collect()
+
+void maybe_garbage_collect()
 {
-    // TODO!
+    static unsigned int counter = 0;
+    
+    // TODO: Find better GC invocation criteria
+    if (counter++ > 1000000) {
+        counter = 0;
+        garbage_collect();
+    }
 }
-*/
 
 
 

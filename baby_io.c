@@ -128,9 +128,13 @@ void baby_print(objptr_t expr)
             putchar(character_value(vector_get(symb->name_string, i)));
         }
     } else if (is_of_type(expr, &TYPE_CLOSURE)) {
-        printf("#<closure>");
+        printf("#<closure:%x>", expr);
     } else if (is_of_type(expr, &TYPE_CLOSURE_PROTOTYPE)) {
-        printf("#<closure-prototype>");
+        printf("#<closure-prototype:%x>", expr);
+    } else if (is_of_type(expr, &TYPE_CHARACTER)) {
+        printf("#<character:%x>", expr);
+    } else if (is_of_type(expr, &TYPE_VECTOR)) {
+        printf("#<vector:%x>", expr);
     } else if (expr == EMPTY_LIST) {
         printf("()");
     } else if (expr == NIL_TRUE) {

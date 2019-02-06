@@ -30,6 +30,7 @@ struct object_type_allocation_block {
     struct object_type_allocation_block *next;
 };
 
+
 struct object_type {
 
     /*
@@ -114,6 +115,8 @@ void make_refcount_immune(objptr_t);
 
 void increase_refcount(objptr_t);
 void decrease_refcount(objptr_t);
+
+void maybe_garbage_collect();
 
 // Init/Termination functions
 void free_type_instances(struct object_type*);
