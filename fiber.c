@@ -159,6 +159,8 @@ DEFTYPE(TYPE_CONTINUATION_FRAME,
  * Fiber code
  */
 
+struct fiber *FIBER_LIST = NULL;
+
 
 void fiber_enter_closure(struct fiber *fib, objptr_t closure)
 {
@@ -179,12 +181,29 @@ void fiber_init(struct fiber *fib, objptr_t thunk)
 {
     assert(fib != NULL);
 
+    fib->waiting_condition.state = RUNNING;
+    
     fib->clink = EMPTY_LIST;
     fib->stack_ptr = EMPTY_LIST;
     fiber_enter_closure(fib, thunk);
     fib->environment = EMPTY_LIST;
     code_pointer_init(&(fib->instr_pointer));
     fiber_enter_closure(fib, thunk);
+
+    /*
+     * Link into FIBER_LIST
+     */
+    if (FIBER_LIST == NULL) {
+        fib->next = fib;
+        fib->prev = fib;
+        FIBER_LIST = fib;
+    } else {
+        fib->prev = FIBER_LIST;
+        fib->next = FIBER_LIST->next;
+        FIBER_LIST->next = fib;
+        fib->next->prev = fib;
+        FIBER_LIST = fib;
+    }
 }
 
 
@@ -192,6 +211,21 @@ void fiber_terminate(struct fiber *fib)
 {
     assert(fib != NULL);
 
+    /*
+     * Unlink from FIBER_LIST
+     */
+    if (FIBER_LIST == fib) {
+        if (fib->prev == fib) {
+            FIBER_LIST = NULL;
+        } else {
+            FIBER_LIST = fib->next;
+        }
+    }
+    if (fib->prev != NULL) fib->prev->next = fib->next;
+    if (fib->next != NULL) fib->next->prev = fib->prev;
+    fib->next = NULL;
+    fib->prev = NULL;
+    
     decrease_refcount(fib->clink);        fib->clink = EMPTY_LIST;
     decrease_refcount(fib->stack_ptr);    fib->stack_ptr = EMPTY_LIST;
     decrease_refcount(fib->environment);  fib->environment = EMPTY_LIST;
@@ -322,7 +356,7 @@ void fiber_tick(struct fiber *fib)
     instr_t instruction;
     unsigned char opcode;
     unsigned int argument;
-    objptr_t object, func;
+    objptr_t object, object2, func;
     struct continuation_frame *frame;
     struct closure *closure;
     struct closure_prototype *closure_prototype;
@@ -333,8 +367,7 @@ void fiber_tick(struct fiber *fib)
     while (!code_pointer_is_valid(&(fib->instr_pointer)))
     {
 	if (fib->clink == EMPTY_LIST) {
-	    // TODO: Set variable in fiber that no code is
-	    //       available
+            fib->waiting_condition.state = HALTED;
 	    return;
 	} else {
 	    /*
@@ -366,9 +399,11 @@ void fiber_tick(struct fiber *fib)
     opcode = INSTRUCTION_PART(instruction);
     argument = ARGUMENT_PART(instruction);
 
+    printf("%02x\n", opcode);
+    
     switch (opcode) {
     case INSTR_HALT:
-	// TODO: Set variable in fib that fiber has halted
+        fib->waiting_condition.state = HALTED;
 	break;
 
     case INSTR_PUSH_CONST:
@@ -422,6 +457,9 @@ void fiber_tick(struct fiber *fib)
                                          argument,
                                          closure_prototype->parameter_vector,
                                          closure_prototype->rest_parameter);
+            decrease_refcount(fib->environment);
+            fib->environment = object;
+            increase_refcount(fib->environment);
 
             // Set code pointer
             code_pointer_enter_func(&(fib->instr_pointer), closure->prototype);
@@ -437,6 +475,7 @@ void fiber_tick(struct fiber *fib)
                          code_pointer_get_constant(&(fib->instr_pointer),
                                                    argument),
                          object);
+        fiber_push(fib, object);
         decrease_refcount(object);
 	break;
 
@@ -446,6 +485,7 @@ void fiber_tick(struct fiber *fib)
                          code_pointer_get_constant(&(fib->instr_pointer),
                                                    argument),
                          object);
+        fiber_push(fib, object);
         decrease_refcount(object);
 	break;
 
@@ -461,8 +501,56 @@ void fiber_tick(struct fiber *fib)
         fiber_push(fib, make_closure_from_prototype(object, fib->environment));
 	break;
 
+    case INSTR_COMPILE_TO_THUNK:
+        object2 = fiber_pop(fib);
+        object = fiber_pop(fib);
+        fiber_push(fib, compile_to_thunk(object, object2));
+        decrease_refcount(object2);
+        decrease_refcount(object);
+        break;
+        
     default:
 	// TODO
 	break;
+    }
+}
+
+
+
+/*
+ * Main loop
+ */
+
+
+struct fiber *start_in_fiber(objptr_t thunk)
+{
+    struct fiber *fib;
+
+    fib = malloc(sizeof(struct fiber));
+
+    if (fib != NULL) {
+        fiber_init(fib, thunk);
+    }
+
+    return fib;
+}
+
+
+void run_main_loop()
+{
+    while (FIBER_LIST != NULL) {
+        // TODO: Go to next fiber if current fiber is blocked
+        // TODO: Call garbage_collect() here!  (Mark all fibers!)
+        FIBER_LIST = FIBER_LIST->next;
+
+        switch (FIBER_LIST->waiting_condition.state) {
+        case RUNNING:
+            fiber_tick(FIBER_LIST);
+            break;
+            // TODO: Case waiting
+        case HALTED:
+            fiber_terminate(FIBER_LIST);
+            break;
+        }
     }
 }

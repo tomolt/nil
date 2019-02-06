@@ -5,7 +5,7 @@
 #include "symbol.h"
 
 #include "compiler.h"
-
+#include "fiber.h"
 #include "baby_io.h"
 
 
@@ -13,8 +13,9 @@ void go()
 {
     bool fail;
     
-    FILE *f = fopen("/tmp/test.scm", "r");
-    printf("%x\n", compile_to_thunk(baby_read(f, &fail), EMPTY_LIST));
+    FILE *f = fopen("./lib/boot.scm", "r");
+    start_in_fiber(compile_to_thunk(baby_read(f, &fail), EMPTY_LIST));
+    run_main_loop();
     fclose(f);
 }
 

@@ -24,5 +24,6 @@ typedef unsigned int instr_t;
 #define INSTR_DEFINE_CONST 0x08
 #define INSTR_POP          0x09  /* POP n, pops n objects */
 #define INSTR_MAKE_CLOSURE 0x0a
+#define INSTR_COMPILE_TO_THUNK 0x0b
 
 #endif

@@ -1,4 +1,5 @@
 #include <assert.h>
+#include <stdio.h>
 #include <stdlib.h>
 
 #include "closure.h"
@@ -140,16 +141,17 @@ void terminate_code(struct code *code)
  */
 
 
-static void compile_expression(objptr_t, struct code*, bool);
+static void compile_expression(objptr_t, struct code*, bool, bool);
 
 static unsigned int compile_parameter_list(objptr_t params,
-                                           struct code *code)
+                                           struct code *code,
+                                           bool leave_returns)
 {
     unsigned int param_count;
     
     for (param_count = 0; is_of_type(params, &TYPE_PAIR); param_count++)
     {
-        compile_expression(get_car(params), code, false);
+        compile_expression(get_car(params), code, false, true);
         params = get_cdr(params);
     }
 
@@ -159,24 +161,27 @@ static unsigned int compile_parameter_list(objptr_t params,
 
 static void compile_begin(objptr_t expr_list,
                           struct code *code,
-                          bool enable_tailcall)
+                          bool enable_tailcall,
+                          bool leave_returns)
 {
     while (is_of_type(expr_list, &TYPE_PAIR))
     {
         if (is_of_type(get_cdr(expr_list), &TYPE_PAIR)) {
             /*
              * This code is located in the middle of a BEGIN
-             * block, so we have to pop the return value.
+             * block, so we have to tell the compiler to drop
+             * all return values.
              */
-            compile_expression(get_car(expr_list), code, false);
-            // XXX: This doesn't always work --> special parameter!
-            code_push_instruction(code, INSTRUCTION(INSTR_POP, 1));
+            compile_expression(get_car(expr_list), code, false, false);
         } else {
             /*
              * This is the last element in the block, so we can
              * use tailcall elimination here.
              */
-            compile_expression(get_car(expr_list), code, enable_tailcall);
+            compile_expression(get_car(expr_list),
+                               code,
+                               enable_tailcall,
+                               leave_returns);
         }
         expr_list = get_cdr(expr_list);
     }
@@ -192,7 +197,7 @@ static objptr_t compile_lambda_prototype(objptr_t params, objptr_t body)
 
     if (func != EMPTY_LIST) {
         instance = (struct closure_prototype*) dereference(func);
-        compile_begin(body, &(instance->code), true);
+        compile_begin(body, &(instance->code), true, true);
     }
 
     return func;
@@ -201,7 +206,8 @@ static objptr_t compile_lambda_prototype(objptr_t params, objptr_t body)
 
 static void compile_expression(objptr_t expr,
                                struct code *code,
-                               bool enable_tailcall)
+                               bool enable_tailcall,
+                               bool leave_returns)
 /*
  * TODO: Add another parameter: no_stack_effect, for use
  * in BEGIN blocks. This parameter will also have to be
@@ -220,20 +226,23 @@ static void compile_expression(objptr_t expr,
         /*
          * Symbols will be looked up.
          */
-        pos = code_add_constant(code, expr);
-        code_push_instruction(code, INSTRUCTION(INSTR_LOOKUP_CONST, pos));
+        if (leave_returns) {
+            pos = code_add_constant(code, expr);
+            code_push_instruction(code, INSTRUCTION(INSTR_LOOKUP_CONST, pos));
+        }
         
     } else if (is_of_type(expr, &TYPE_PAIR)) {
         /*
          * This is either a function call, or a builtin special form.
          */
-        
         car = get_car(expr);
         cdr = get_cdr(expr);
         
         if (car == SYMBOL_QUOTE) {
-            pos = code_add_constant(code, get_car(get_cdr(expr)));
-            code_push_instruction(code, INSTRUCTION(INSTR_PUSH_CONST, pos));
+            if (leave_returns) {
+                pos = code_add_constant(code, get_car(get_cdr(expr)));
+                code_push_instruction(code, INSTRUCTION(INSTR_PUSH_CONST, pos));
+            }
             
         } else if (car == SYMBOL_SETBANG) {
             cadr = get_car(get_cdr(expr));
@@ -241,9 +250,13 @@ static void compile_expression(objptr_t expr,
             
             if (cadr != EMPTY_LIST) {
                 pos = code_add_constant(code, cadr);
-                compile_expression(caddr, code, false);
+                compile_expression(caddr, code, false, leave_returns);
                 code_push_instruction(code, INSTRUCTION(INSTR_SET_CONST, pos));
             } // TODO: else: error!
+
+            if (!leave_returns) {
+                code_push_instruction(code, INSTRUCTION(INSTR_POP, 1));
+            }
 
         } else if (car == SYMBOL_DEFINE) {
             cadr = get_car(get_cdr(expr));
@@ -264,10 +277,14 @@ static void compile_expression(objptr_t expr,
 		 */
 		caddr = get_car(get_cdr(get_cdr(expr)));
                 pos = code_add_constant(code, cadr);
-                compile_expression(caddr, code, false);
+                compile_expression(caddr, code, false, leave_returns);
                 code_push_instruction(code,
                                       INSTRUCTION(INSTR_DEFINE_CONST, pos));
             } // TODO: else: error!
+
+            if (!leave_returns) {
+                code_push_instruction(code, INSTRUCTION(INSTR_POP, 1));
+            }
             
         } else if (car == SYMBOL_IF) {
             unsigned int jmploc;
@@ -288,43 +305,45 @@ static void compile_expression(objptr_t expr,
                 elseclause = get_car(get_cdr(get_cdr(get_cdr(expr))));
             }
 
-            compile_expression(condition, code, false);
+            compile_expression(condition, code, false, true);
             jmploc = code_push_instruction(code,
                                            INSTRUCTION(INSTR_JMP_IF_NOT, ~0));
-            compile_expression(ifclause, code, enable_tailcall);
+            compile_expression(ifclause, code, enable_tailcall, leave_returns);
             endloc = code_push_instruction(code,
                                            INSTRUCTION(INSTR_JMP, ~0));
             code_set_instruction(code,
                                  jmploc,
                                  INSTRUCTION(INSTR_JMP_IF_NOT, endloc + 1));
-            compile_expression(elseclause, code, enable_tailcall);
+            compile_expression(elseclause, code, enable_tailcall, leave_returns);
             code_set_instruction(code,
                                  endloc,
                                  INSTRUCTION(INSTR_JMP,
                                              code_get_write_location(code)));
 
         } else if (car == SYMBOL_BEGIN) {
-            compile_begin(get_cdr(expr), code, enable_tailcall);
+            compile_begin(get_cdr(expr), code, enable_tailcall, leave_returns);
             
         } else if (car == SYMBOL_LAMBDA) {
             objptr_t param_list;
             objptr_t body;
             objptr_t func;
 
-            param_list = get_car(get_cdr(expr));
-            body = get_cdr(get_cdr(expr));
-            
-            func = compile_lambda_prototype(param_list, body);
-            pos = code_add_constant(code, func);
-            code_push_instruction(code, INSTRUCTION(INSTR_MAKE_CLOSURE, pos));
+            if (leave_returns) {
+                param_list = get_car(get_cdr(expr));
+                body = get_cdr(get_cdr(expr));
+                
+                func = compile_lambda_prototype(param_list, body);
+                pos = code_add_constant(code, func);
+                code_push_instruction(code, INSTRUCTION(INSTR_MAKE_CLOSURE, pos));
+            }
             
         } else {
             /*
              * No builtin special form has matched, so we compile
              * a basic function call.
              */
-            param_count = compile_parameter_list(cdr, code);
-            compile_expression(car, code, false);
+            param_count = compile_parameter_list(cdr, code, true);
+            compile_expression(car, code, false, true);
             if (enable_tailcall) {
                 code_push_instruction(code,
                                       INSTRUCTION(INSTR_TAILCALL,
@@ -334,20 +353,26 @@ static void compile_expression(objptr_t expr,
                                       INSTRUCTION(INSTR_CALL,
                                                   param_count));
             }
+            
+            if (!leave_returns) {
+                code_push_instruction(code, INSTRUCTION(INSTR_POP, 1));
+            }
         }
     } else {
         /*
          * All other objects evaluate to themselves.
          */
-        pos = code_add_constant(code, expr);
-        code_push_instruction(code, INSTRUCTION(INSTR_PUSH_CONST, pos));
+        if (leave_returns) {
+            pos = code_add_constant(code, expr);
+            code_push_instruction(code, INSTRUCTION(INSTR_PUSH_CONST, pos));
+        }
     }
 }
 
 
 void compile(objptr_t expr, struct code *code)
 {
-    compile_expression(expr, code, true);
+    compile_expression(expr, code, true, true);
 }
 
 

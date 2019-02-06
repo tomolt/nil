@@ -5,8 +5,10 @@
 #include "pair.h"
 #include "vector.h"
 #include "character.h"
+#include "closure.h"
 
 #include "baby_io.h"
+
 
 
 static bool is_whitespace_char(int c)
@@ -104,6 +106,8 @@ objptr_t baby_read(FILE *f, bool *fail)
     } else if (is_digit(c)) {
         // TODO
         return EMPTY_LIST;
+    } else if (c == '\'') {
+        return cons(SYMBOL_QUOTE, cons(baby_read(f, fail), EMPTY_LIST));
     } else {
         ungetc(c, f);
         return read_symbol(f, fail);
@@ -123,6 +127,10 @@ void baby_print(objptr_t expr)
         for (unsigned int i = 0; i < vector_length(symb->name_string); i++) {
             putchar(character_value(vector_get(symb->name_string, i)));
         }
+    } else if (is_of_type(expr, &TYPE_CLOSURE)) {
+        printf("#<closure>");
+    } else if (is_of_type(expr, &TYPE_CLOSURE_PROTOTYPE)) {
+        printf("#<closure-prototype>");
     } else if (expr == EMPTY_LIST) {
         printf("()");
     } else if (expr == NIL_TRUE) {

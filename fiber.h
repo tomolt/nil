@@ -40,9 +40,22 @@ struct continuation_frame {
 extern struct object_type TYPE_CONTINUATION_FRAME;
 
 
+
+enum fiber_thread_state {
+    HALTED, RUNNING
+};
+
+
+struct fiber_waiting_condition {
+    enum fiber_thread_state state;
+};
+
+
 struct fiber {
-    // TODO: Prev/Next fiber
-    // TODO: Waiting condition
+    struct fiber *prev;
+    struct fiber *next;
+
+    struct fiber_waiting_condition waiting_condition;
     
     objptr_t clink;  // Continuation / Frame stack
     objptr_t stack_ptr;
@@ -54,7 +67,9 @@ struct fiber {
 void fiber_init(struct fiber*, objptr_t);
 void fiber_terminate(struct fiber*);
 
-void fiber_tick(struct fiber*);
+struct fiber *start_in_fiber(objptr_t);
+
+void run_main_loop();
 
 
 #endif
