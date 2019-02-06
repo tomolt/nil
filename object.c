@@ -558,7 +558,7 @@ static void sweep()
     /*
      * This garbage collector doesn't rebuild the freelist,
      * it detects cells which are not in the freelist and
-     * add them to the front of the freelist if they contain
+     * adds them to the front of the freelist if they contain
      * unmarked objects. NULLs are considered to be part of
      * the freelist.
      */
