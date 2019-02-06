@@ -28,7 +28,7 @@ struct environment {
 };
 
 
-extern struct object_type ENVIRONMENT_TYPE;
+extern struct object_type TYPE_ENVIRONMENT;
 
 
 objptr_t environment_get_parent(objptr_t);

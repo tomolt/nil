@@ -37,6 +37,7 @@ struct continuation_frame {
 };
 
 
+extern struct object_type TYPE_CONTINUATION_FRAME;
 
 
 struct fiber {

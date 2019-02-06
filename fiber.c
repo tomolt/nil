@@ -28,9 +28,10 @@ void code_pointer_init(struct code_pointer *ptr)
 }
 
 
-void code_pointer_init_from_func(struct code_pointer *ptr, objptr_t func)
+void code_pointer_enter_func(struct code_pointer *ptr, objptr_t func)
 {
-    assert((ptr != NULL) && (is_of_type(func, &TYPE_CLOSURE_PROTOTYPE)));   
+    assert((ptr != NULL) && (is_of_type(func, &TYPE_CLOSURE_PROTOTYPE)));
+    decrease_refcount(ptr->func);
     ptr->func = func;
     increase_refcount(func);
     ptr->code = &(((struct closure_prototype*) dereference(func))->code);
@@ -93,6 +94,66 @@ bool code_pointer_is_valid(struct code_pointer *ptr)
 
 
 
+/*
+ * Continuation frame
+ */
+
+
+void init_continuation_frame(struct continuation_frame *cf)
+{
+    cf->clink = EMPTY_LIST;
+    cf->stack_ptr = EMPTY_LIST;
+    cf->environment = EMPTY_LIST;
+    code_pointer_init(&(cf->instr_pointer));
+}
+
+
+void terminate_continuation_frame(struct continuation_frame *cf)
+{
+    decrease_refcount(cf->clink);
+    cf->clink = EMPTY_LIST;
+    decrease_refcount(cf->stack_ptr);
+    decrease_refcount(cf->environment);
+    code_pointer_terminate(&(cf->instr_pointer));
+}
+
+
+unsigned int continuation_frame_slot_count(struct continuation_frame *cf)
+{
+    return 4;
+}
+
+
+objptr_t continuation_frame_slot_accessor(struct continuation_frame *cf,
+                                          unsigned int slot)
+{
+    switch (slot) {
+    case 0: return cf->clink;
+    case 1: return cf->stack_ptr;
+    case 2: return cf->environment;
+    case 3: return cf->instr_pointer.func;
+    default: return EMPTY_LIST;
+    }
+}
+
+
+bool continuation_frame_eqv(struct continuation_frame *c1,
+                            struct continuation_frame *c2,
+                            enum eqv_strictness strictness)
+{
+    return c1 == c2;
+}
+
+
+DEFTYPE(TYPE_CONTINUATION_FRAME,
+        struct continuation_frame,
+        init_continuation_frame,
+        terminate_continuation_frame,
+        continuation_frame_slot_count,
+        continuation_frame_slot_accessor,
+        continuation_frame_eqv);
+
+
 
 /*
  * Fiber code
@@ -109,8 +170,8 @@ void fiber_enter_closure(struct fiber *fib, objptr_t closure)
 
     fib->environment = instance->environment;
     increase_refcount(fib->environment);
-    code_pointer_init_from_func(&(fib->instr_pointer),
-                                instance->prototype);
+    code_pointer_enter_func(&(fib->instr_pointer),
+                            instance->prototype);
 }
 
 
@@ -165,6 +226,92 @@ static objptr_t fiber_pop(struct fiber *fib)
 }
 
 
+static objptr_t fiber_get_continuation(struct fiber *fib)
+{
+    objptr_t continuation;
+    struct continuation_frame *cf;
+
+    continuation = object_allocate(&TYPE_CONTINUATION_FRAME);
+
+    if (continuation != EMPTY_LIST) {
+        cf = (struct continuation_frame*) dereference(continuation);
+        cf->clink = fib->clink;             increase_refcount(cf->clink);
+        cf->stack_ptr = fib->stack_ptr;     increase_refcount(cf->stack_ptr);
+        cf->environment = fib->environment; increase_refcount(cf->environment);
+        code_pointer_copy(&(cf->instr_pointer), &(fib->instr_pointer));
+    }
+
+    return continuation;
+}
+
+
+static objptr_t fiber_unwrap_params(struct fiber *fib,
+                                    unsigned int given_var_count,
+                                    objptr_t variable_name_vector,
+                                    objptr_t rest_parameter_name)
+{
+    unsigned int i;
+    unsigned int named_variable_count;
+    unsigned int rest_variable_count;
+    objptr_t object;
+    objptr_t rest_parameter_list;
+    objptr_t environment;
+
+    /*
+     * Set parameter counts
+     */
+    named_variable_count = vector_length(variable_name_vector);
+    if (given_var_count < named_variable_count) {
+        return EMPTY_LIST;
+    }
+    rest_variable_count = given_var_count - named_variable_count;
+    
+    /*
+     * Push a new environment
+     */
+    environment = object_allocate(&TYPE_ENVIRONMENT);
+    if (environment == EMPTY_LIST) {
+        return EMPTY_LIST;
+    }
+    environment_set_parent(environment, fib->environment);
+
+    /*
+     * Bind rest parameters
+     */
+    if (rest_parameter_name != EMPTY_LIST) {
+        rest_parameter_list = EMPTY_LIST;
+        
+        for (i = 0; i < rest_variable_count; i++)
+        {
+            object = fiber_pop(fib);
+            rest_parameter_list = cons(object, rest_parameter_list);
+            decrease_refcount(object);
+        }
+
+        environment_bind(environment, rest_parameter_name, rest_parameter_list);
+    }
+
+    /*
+     * Bind named parameters
+     */
+    for (i = named_variable_count - 1; i >= 0; i--)
+    {
+        object = fiber_pop(fib);
+        environment_bind(environment,
+                         vector_get(variable_name_vector, i),
+                         object);
+        decrease_refcount(object);
+    }
+    
+    return environment;
+}
+
+
+
+/*
+ * Bytecode interpreter
+ */
+
 void fiber_tick(struct fiber *fib)
 {
     /*
@@ -175,8 +322,10 @@ void fiber_tick(struct fiber *fib)
     instr_t instruction;
     unsigned char opcode;
     unsigned int argument;
+    objptr_t object, func;
     struct continuation_frame *frame;
-    objptr_t object;
+    struct closure *closure;
+    struct closure_prototype *closure_prototype;
 
     /*
      * Return from functions
@@ -209,7 +358,6 @@ void fiber_tick(struct fiber *fib)
     }
 
 
-    
     /*
      * Let's start interpreting bytecodes!
      */
@@ -224,7 +372,8 @@ void fiber_tick(struct fiber *fib)
 	break;
 
     case INSTR_PUSH_CONST:
-	fiber_push(fib, code_pointer_get_constant(&(fib->instr_pointer), argument));
+	fiber_push(fib,
+                   code_pointer_get_constant(&(fib->instr_pointer), argument));
 	break;
 
     case INSTR_LOOKUP_CONST:
@@ -245,17 +394,48 @@ void fiber_tick(struct fiber *fib)
 	break;
 
     case INSTR_CALL:
-	// TODO
-	break;
-
+        object = fiber_get_continuation(fib);
+        // We can do this since the continuation definitely contains a link
+        // to the older clink
+        decrease_refcount(fib->clink);
+        fib->clink = object;
+        increase_refcount(fib->clink);
     case INSTR_TAILCALL:
-	// TODO
+        func = fiber_pop(fib);
+        if (is_of_type(func, &TYPE_CLOSURE)) {
+            closure = (struct closure*) dereference(func);
+
+            // Replace environment
+            decrease_refcount(fib->environment);
+            fib->environment = closure->environment;
+            increase_refcount(fib->environment);
+
+            if (!is_of_type(closure->prototype, &TYPE_CLOSURE_PROTOTYPE)) {
+                // XXX: error: invalid closure!
+            }
+
+            closure_prototype =
+                (struct closure_prototype*) dereference(closure->prototype);
+
+            // Unpack parameters
+            object = fiber_unwrap_params(fib,
+                                         ARGUMENT_PART(opcode),
+                                         closure_prototype->parameter_vector,
+                                         closure_prototype->rest_parameter);
+
+            // Set code pointer
+            code_pointer_enter_func(&(fib->instr_pointer), closure->prototype);
+        } else {
+            // XXX: error: can't call this!
+        }
+        decrease_refcount(func);
 	break;
 
     case INSTR_SET_CONST:
         object = fiber_pop(fib);
         environment_bind(fib->environment,
-                         code_pointer_get_constant(&(fib->instr_pointer), argument),
+                         code_pointer_get_constant(&(fib->instr_pointer),
+                                                   argument),
                          object);
         decrease_refcount(object);
 	break;
@@ -263,7 +443,8 @@ void fiber_tick(struct fiber *fib)
     case INSTR_DEFINE_CONST:
         object = fiber_pop(fib);
         environment_bind(fib->environment,
-                         code_pointer_get_constant(&(fib->instr_pointer), argument),
+                         code_pointer_get_constant(&(fib->instr_pointer),
+                                                   argument),
                          object);
         decrease_refcount(object);
 	break;
