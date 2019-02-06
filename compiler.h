@@ -26,6 +26,7 @@ unsigned int code_get_write_location(struct code*);
 void compile(objptr_t, struct code*);
 
 void init_code(struct code*);
+void init_code_by_copy(struct code*, struct code*);
 void terminate_code(struct code*);
 
 #endif

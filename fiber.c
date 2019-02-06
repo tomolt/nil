@@ -19,12 +19,21 @@
  */
 
 
+void code_pointer_init(struct code_pointer *ptr)
+{
+    assert(ptr != NULL);   
+    ptr->func = EMPTY_LIST;
+    ptr->code = NULL;
+    ptr->offset = 0;
+}
+
+
 void code_pointer_init_from_func(struct code_pointer *ptr, objptr_t func)
 {
-    assert((ptr != NULL) && (is_of_type(func, &TYPE_CLOSURE)));
+    assert((ptr != NULL) && (is_of_type(func, &TYPE_CLOSURE_PROTOTYPE)));   
     ptr->func = func;
     increase_refcount(func);
-    ptr->code = &(((struct closure*) dereference(func))->code);
+    ptr->code = &(((struct closure_prototype*) dereference(func))->code);
     ptr->offset = 0;
 }
 
@@ -90,14 +99,31 @@ bool code_pointer_is_valid(struct code_pointer *ptr)
  */
 
 
+void fiber_enter_closure(struct fiber *fib, objptr_t closure)
+{
+    struct closure *instance;
+    
+    assert(fib != NULL && is_of_type(closure, &TYPE_CLOSURE));
+
+    instance = (struct closure*) dereference(closure);
+
+    fib->environment = instance->environment;
+    increase_refcount(fib->environment);
+    code_pointer_init_from_func(&(fib->instr_pointer),
+                                instance->prototype);
+}
+
+
 void fiber_init(struct fiber *fib, objptr_t thunk)
 {
     assert(fib != NULL);
 
     fib->clink = EMPTY_LIST;
     fib->stack_ptr = EMPTY_LIST;
+    fiber_enter_closure(fib, thunk);
     fib->environment = EMPTY_LIST;
-    code_pointer_init_from_func(&(fib->instr_pointer), thunk);
+    code_pointer_init(&(fib->instr_pointer));
+    fiber_enter_closure(fib, thunk);
 }
 
 
@@ -129,10 +155,6 @@ static objptr_t fiber_pop(struct fiber *fib)
     objptr_t object;
     objptr_t next_elem;
 
-    /*
-     * XXX: Does this GC code really work?
-     */
-    
     object = get_car(fib->stack_ptr);
     increase_refcount(object);
     next_elem = get_cdr(fib->stack_ptr);
@@ -231,11 +253,19 @@ void fiber_tick(struct fiber *fib)
 	break;
 
     case INSTR_SET_CONST:
-	// TODO
+        object = fiber_pop(fib);
+        environment_bind(fib->environment,
+                         code_pointer_get_constant(&(fib->instr_pointer), argument),
+                         object);
+        decrease_refcount(object);
 	break;
 
     case INSTR_DEFINE_CONST:
-	// TODO
+        object = fiber_pop(fib);
+        environment_bind(fib->environment,
+                         code_pointer_get_constant(&(fib->instr_pointer), argument),
+                         object);
+        decrease_refcount(object);
 	break;
 
     case INSTR_POP:
@@ -243,7 +273,9 @@ void fiber_tick(struct fiber *fib)
 	break;
 
     case INSTR_MAKE_CLOSURE:
-	// TODO
+        object = fiber_pop(fib);
+        fiber_push(fib, make_closure_from_prototype(object, fib->environment));
+        decrease_refcount(object);
 	break;
 
     default:

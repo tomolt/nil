@@ -95,6 +95,17 @@ void init_code(struct code *code)
 }
 
 
+void init_code_by_copy(struct code *dest, struct code *src)
+{
+    assert(dest != NULL && src != NULL);
+    dest->constant_vector = src->constant_vector;
+    increase_refcount(dest->constant_vector);
+    dest->code_size = src->code_size;
+    dest->code_alloc = src->code_alloc;
+    dest->codes = NULL;  // XXX: How do we handle this?
+}
+
+
 void terminate_code(struct code *code)
 {
     decrease_refcount(code->constant_vector);
@@ -105,6 +116,7 @@ void terminate_code(struct code *code)
 	code->codes = NULL;
     }
 }
+
 
 
 
@@ -158,12 +170,12 @@ static void compile_begin(objptr_t expr_list,
 static objptr_t compile_lambda_prototype(objptr_t params, objptr_t body)
 {
     objptr_t func;
-    struct closure *instance;
+    struct closure_prototype *instance;
     
     func = make_closure_prototype(params);
 
     if (func != EMPTY_LIST) {
-        instance = (struct closure*) dereference(func);
+        instance = (struct closure_prototype*) dereference(func);
         compile_begin(body, &(instance->code), true);
     }
 
