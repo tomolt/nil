@@ -1,15 +1,21 @@
 #include <stdio.h>
 
-#include "object.h"
 #include "character.h"
-#include "symbol.h"
 #include "vector.h"
+#include "symbol.h"
 
 #include "compiler.h"
+
+#include "baby_io.h"
 
 
 void go()
 {
+    bool fail;
+    
+    FILE *f = fopen("/tmp/test.scm", "r");
+    printf("%x\n", compile_to_thunk(baby_read(f, &fail), EMPTY_LIST));
+    fclose(f);
 }
 
 

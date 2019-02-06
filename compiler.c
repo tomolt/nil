@@ -22,6 +22,8 @@ unsigned int code_push_instruction(struct code *code,
 
     assert(code != NULL);
 
+    printf("Pushing instruction %08x\n", instruction);
+    
     if (code->code_alloc >= code->code_size) {        
         if (code->code_alloc == 0) {
             new_alloc = 8;
@@ -131,7 +133,7 @@ static unsigned int compile_parameter_list(objptr_t params,
                                            struct code *code)
 {
     unsigned int param_count;
-
+    
     for (param_count = 0; is_of_type(params, &TYPE_PAIR); param_count++)
     {
         compile_expression(get_car(params), code, false);
@@ -198,6 +200,7 @@ static void compile_expression(objptr_t expr,
     objptr_t caddr;
     unsigned int pos;
     unsigned int param_count;
+
     
     if (is_of_type(expr, &TYPE_SYMBOL)) {
         /*
@@ -213,7 +216,7 @@ static void compile_expression(objptr_t expr,
         
         car = get_car(expr);
         cdr = get_cdr(expr);
-
+        
         if (car == SYMBOL_QUOTE) {
             pos = code_add_constant(code, get_car(get_cdr(expr)));
             code_push_instruction(code, INSTRUCTION(INSTR_PUSH_CONST, pos));
@@ -306,8 +309,8 @@ static void compile_expression(objptr_t expr,
              * No builtin special form has matched, so we compile
              * a basic function call.
              */
-            compile_expression(car, code, false);
             param_count = compile_parameter_list(cdr, code);
+            compile_expression(car, code, false);
             if (enable_tailcall) {
                 code_push_instruction(code,
                                       INSTRUCTION(INSTR_TAILCALL,
@@ -332,3 +335,22 @@ void compile(objptr_t expr, struct code *code)
 {
     compile_expression(expr, code, true);
 }
+
+
+objptr_t compile_to_thunk(objptr_t expr, objptr_t environment)
+{
+    objptr_t ptr;
+    struct closure_prototype *proto;
+
+    ptr = object_allocate(&TYPE_CLOSURE_PROTOTYPE);
+
+    if (ptr != EMPTY_LIST) {
+        proto = (struct closure_prototype*) dereference(ptr);
+        proto->parameter_vector = make_vector(0, EMPTY_LIST);
+        compile(expr, &(proto->code));
+        return make_closure_from_prototype(ptr, environment);
+    } else {
+        return EMPTY_LIST;
+    }
+}
+

@@ -20,9 +20,10 @@ extern struct object_type TYPE_CHARACTER;
 
 
 objptr_t get_character(unichar_t code);
-// TODO
+unichar_t character_value(objptr_t);
 
 void init_characters();
 void terminate_characters();
+
 
 #endif

@@ -66,6 +66,18 @@ objptr_t get_character(unichar_t code)
 }
 
 
+unichar_t character_value(objptr_t c)
+{
+    struct character *inst;
+    
+    if (is_of_type(c, &TYPE_CHARACTER)) {
+        inst = (struct character*) dereference(c);
+        return inst->code;
+    } else {
+        return 0;
+    }
+}
+
 
 void init_characters()
 {

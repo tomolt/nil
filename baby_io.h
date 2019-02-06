@@ -1,7 +1,7 @@
 #pragma once
 
-#ifndef BABY_READER_H_
-#define BABY_READER_H_
+#ifndef BABY_IO_H_
+#define BABY_IO_H_
 
 #include <stdio.h>
 #include <stdbool.h>
@@ -10,6 +10,7 @@
 
 
 objptr_t baby_read(FILE*, bool*);
+void baby_print(objptr_t);
 
 
 #endif

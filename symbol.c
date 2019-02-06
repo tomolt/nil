@@ -51,7 +51,7 @@ void terminate_symbol(struct symbol *symbol)
     /*
      * Remove symbol from symbol table
      */
-
+    
     if (SYMBOL_TABLE == symbol) {
 	if (symbol->symbol_table_prev == symbol) {
 	    // We deleted the last symbol in the table

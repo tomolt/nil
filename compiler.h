@@ -24,6 +24,7 @@ unsigned int code_add_constant(struct code*, objptr_t);
 unsigned int code_get_write_location(struct code*);
 
 void compile(objptr_t, struct code*);
+objptr_t compile_to_thunk(objptr_t, objptr_t);
 
 void init_code(struct code*);
 void init_code_by_copy(struct code*, struct code*);

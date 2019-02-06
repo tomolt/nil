@@ -107,7 +107,7 @@ void set_cdr(objptr_t ptr, objptr_t cdr)
     if (is_of_type(ptr, &TYPE_PAIR)) {
 	pair = (struct pair*) dereference(ptr);
 	decrease_refcount(pair->cdr);
-	pair->car = cdr;
+	pair->cdr = cdr;
 	increase_refcount(cdr);
     }  // else: Error?
 }
