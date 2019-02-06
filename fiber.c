@@ -398,8 +398,6 @@ void fiber_tick(struct fiber *fib)
     instruction = code_pointer_get(&(fib->instr_pointer));
     opcode = INSTRUCTION_PART(instruction);
     argument = ARGUMENT_PART(instruction);
-
-    printf("%02x\n", opcode);
     
     switch (opcode) {
     case INSTR_HALT:
@@ -520,7 +518,6 @@ void fiber_tick(struct fiber *fib)
 /*
  * Main loop
  */
-
 
 struct fiber *start_in_fiber(objptr_t thunk)
 {

@@ -400,7 +400,9 @@ void increase_refcount(objptr_t ptr)
     if (object == NULL) return;
     
     if ((object->flags & OBJECT_REFCOUNT_BITMASK) != OBJECT_REFCOUNT_BITMASK) {
-	object->flags |= (((object->flags & OBJECT_REFCOUNT_BITMASK) + 1) & OBJECT_REFCOUNT_BITMASK);
+        object->flags = (object->flags & ~OBJECT_REFCOUNT_BITMASK)
+            | (((object->flags & OBJECT_REFCOUNT_BITMASK) + 1)
+               & OBJECT_REFCOUNT_BITMASK);
     }
 }
 
@@ -427,7 +429,9 @@ void decrease_refcount(objptr_t ptr)
     // Make sure that the reference count doesn't exceed the maximum number, or zero
     if (((object->flags & OBJECT_REFCOUNT_BITMASK) != 0) &&
 	((object->flags & OBJECT_REFCOUNT_BITMASK) != OBJECT_REFCOUNT_BITMASK)) {
-	object->flags |= (((object->flags & OBJECT_REFCOUNT_BITMASK) - 1) & OBJECT_REFCOUNT_BITMASK);
+        object->flags = (object->flags & ~OBJECT_REFCOUNT_BITMASK)
+            | (((object->flags & OBJECT_REFCOUNT_BITMASK) - 1)
+               & OBJECT_REFCOUNT_BITMASK);
     }
 
     if ((object->flags & OBJECT_REFCOUNT_BITMASK) == 0) {
