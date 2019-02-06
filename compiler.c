@@ -22,7 +22,7 @@ unsigned int code_push_instruction(struct code *code,
 
     assert(code != NULL);
 
-    printf("Pushing instruction %08x\n", instruction);
+    printf("%03x <- %08x\n", code->code_size, instruction);
     
     if (code->code_alloc >= code->code_size) {        
         if (code->code_alloc == 0) {
@@ -43,8 +43,8 @@ unsigned int code_push_instruction(struct code *code,
 
 
 void code_set_instruction(struct code *code,
-                          instr_t instruction,
-                          unsigned int pos)
+                          unsigned int pos,
+                          instr_t instruction)
 {
     /*
      * Note: Does not change the allocated memory,
@@ -53,6 +53,8 @@ void code_set_instruction(struct code *code,
     
     assert(code != NULL);
 
+    printf("%03x <- %08x (:)\n", pos, instruction);
+    
     if (pos < code->code_alloc) {
         code->codes[pos] = instruction;
     }
@@ -61,6 +63,7 @@ void code_set_instruction(struct code *code,
 
 unsigned int code_add_constant(struct code *code, objptr_t constant)
 {
+    int i;
     unsigned int pos;
     
     assert(code != NULL);
@@ -70,9 +73,19 @@ unsigned int code_add_constant(struct code *code, objptr_t constant)
         // FIXME: Handle allocation failures
     }
 
-    // TODO: Check whether the object already is in the vector,
-    // so that we can avoid storing multiple instances in the
-    // same vector.
+    /*
+     * Check whether the constant is already present
+     * in the constant vector. If it is, return its
+     * index instead of creating a new one.
+     */
+    for (i = vector_length(code->constant_vector) - 1; i >= 0; i--)
+    {
+        if (eqv(vector_get(code->constant_vector, i),
+                constant,
+                EQ_STRICT)) {
+            return i;
+        }
+    }
     
     pos = vector_length(code->constant_vector);
     vector_append(code->constant_vector, constant);
@@ -156,6 +169,7 @@ static void compile_begin(objptr_t expr_list,
              * block, so we have to pop the return value.
              */
             compile_expression(get_car(expr_list), code, false);
+            // XXX: This doesn't always work --> special parameter!
             code_push_instruction(code, INSTRUCTION(INSTR_POP, 1));
         } else {
             /*
@@ -265,13 +279,13 @@ static void compile_expression(objptr_t expr,
             condition = get_car(get_cdr(expr));
             ifclause = get_car(get_cdr(get_cdr(expr)));
             
-            if (!is_of_type(get_cdr(get_cdr(expr)), &TYPE_PAIR)) {
+            if (!is_of_type(get_cdr(get_cdr(get_cdr(expr))), &TYPE_PAIR)) {
                 /*
                  * No else clause
                  */
                 elseclause = NIL_FALSE;
             } else {
-                elseclause = get_car(get_cdr(get_cdr(expr)));
+                elseclause = get_car(get_cdr(get_cdr(get_cdr(expr))));
             }
 
             compile_expression(condition, code, false);
@@ -298,8 +312,8 @@ static void compile_expression(objptr_t expr,
             objptr_t func;
 
             param_list = get_car(get_cdr(expr));
-            body = get_car(get_cdr(get_cdr(expr)));
-
+            body = get_cdr(get_cdr(expr));
+            
             func = compile_lambda_prototype(param_list, body);
             pos = code_add_constant(code, func);
             code_push_instruction(code, INSTRUCTION(INSTR_MAKE_CLOSURE, pos));

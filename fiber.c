@@ -250,7 +250,7 @@ static objptr_t fiber_unwrap_params(struct fiber *fib,
                                     objptr_t variable_name_vector,
                                     objptr_t rest_parameter_name)
 {
-    unsigned int i;
+    int i;
     unsigned int named_variable_count;
     unsigned int rest_variable_count;
     objptr_t object;
@@ -419,7 +419,7 @@ void fiber_tick(struct fiber *fib)
 
             // Unpack parameters
             object = fiber_unwrap_params(fib,
-                                         ARGUMENT_PART(opcode),
+                                         argument,
                                          closure_prototype->parameter_vector,
                                          closure_prototype->rest_parameter);
 
@@ -450,13 +450,15 @@ void fiber_tick(struct fiber *fib)
 	break;
 
     case INSTR_POP:
-	decrease_refcount(fiber_pop(fib));
+        for (unsigned int i = 0; i < argument; i++)
+        {
+            decrease_refcount(fiber_pop(fib));
+        }
 	break;
 
     case INSTR_MAKE_CLOSURE:
-        object = fiber_pop(fib);
+        object = code_pointer_get_constant(&(fib->instr_pointer), argument);
         fiber_push(fib, make_closure_from_prototype(object, fib->environment));
-        decrease_refcount(object);
 	break;
 
     default:
