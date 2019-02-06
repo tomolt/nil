@@ -4,6 +4,7 @@ CFLAGS = -Wall -g
 LDFLAGS = 
 
 OBJECTS = \
+baby_reader.o \
 fiber.o \
 compiler.o \
 closure.o \
