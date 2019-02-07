@@ -181,6 +181,9 @@ static objptr_t heap_array_address_to_objptr(struct heap_cell *addr)
     return (objptr_t) (addr - HEAP_ARRAY);
 }
 
+/*
+ * TODO: optimize
+ */
 static struct heap_cell *dereference_slot(objptr_t ptr)
 {
     assert(ptr >= 0 && ptr < HEAP_ARRAY_SLOT_COUNT);
@@ -297,6 +300,9 @@ static void object_deallocate(objptr_t ptr)
  */
 
 
+/*
+ * TODO: optimize
+ */
 struct object *dereference(objptr_t ptr)
 {
     // TODO: Bounds check! --> return EMPTY_LIST
@@ -308,6 +314,9 @@ struct object *dereference(objptr_t ptr)
 }
 
 
+/*
+ * TODO: optimize
+ */
 bool is_of_type(objptr_t ptr, struct object_type *type)
 {
     struct object *object;
@@ -321,6 +330,9 @@ bool is_of_type(objptr_t ptr, struct object_type *type)
 }
 
 
+/*
+ * TODO: optimize
+ */
 bool eqv(objptr_t p1, objptr_t p2, enum eqv_strictness strictness)
 {
     struct object *o1;
@@ -384,6 +396,9 @@ objptr_t object_allocate(struct object_type *type)
 }
 
 
+/*
+ * TODO: optimize
+ */
 void increase_refcount(objptr_t ptr)
 {
     struct heap_cell *slot;
@@ -410,6 +425,9 @@ void increase_refcount(objptr_t ptr)
 }
 
 
+/*
+ * TODO: optimize
+ */
 void decrease_refcount(objptr_t ptr)
 {
     struct heap_cell *slot;
